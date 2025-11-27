@@ -125,7 +125,7 @@ export class Parser {
       const variantName = this.consume(TokenType.IDENTIFIER, 'Expected variant name').lexeme;
 
       let value: AST.Literal | undefined;
-      if (this.match(TokenType.EQ)) {
+      if (this.match(TokenType.ASSIGN)) {
         value = this.literal();
       }
 
@@ -170,7 +170,7 @@ export class Parser {
       dimension = this.consume(TokenType.IDENTIFIER, 'Expected dimension name').lexeme;
     }
 
-    if (this.match(TokenType.EQ)) {
+    if (this.match(TokenType.ASSIGN)) {
       expr = this.unitExpr();
     }
 
@@ -690,7 +690,6 @@ export class Parser {
       if (this.match(TokenType.DOT, TokenType.QDOT)) {
         const optional = this.previous().type === TokenType.QDOT;
         const field = this.consume(TokenType.IDENTIFIER, 'Expected field name after \'.\'').lexeme;
-        const span = expr.span; // Simplified
 
         // Extend path expression
         if (expr.kind === 'PathExpr') {
@@ -702,7 +701,6 @@ export class Parser {
       } else if (this.match(TokenType.LBRACKET)) {
         const index = this.expression();
         this.consume(TokenType.RBRACKET, 'Expected \']\' after index');
-        const span = expr.span; // Simplified
 
         if (expr.kind === 'PathExpr') {
           expr.segments.push({ kind: 'IndexAccess', index });

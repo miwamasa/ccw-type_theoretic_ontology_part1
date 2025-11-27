@@ -4,7 +4,6 @@
 
 import { Command } from 'commander';
 import * as fs from 'fs';
-import * as path from 'path';
 import { Lexer } from '../lexer/lexer';
 import { Parser } from '../parser/parser';
 import { Resolver } from '../analyzer/resolver';

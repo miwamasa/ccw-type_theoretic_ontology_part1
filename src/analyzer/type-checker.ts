@@ -2,7 +2,7 @@
 
 import * as AST from '../parser/ast';
 import * as Types from './types';
-import { SymbolTable, Symbol } from './scope';
+import { SymbolTable } from './scope';
 import { Unit, UNIT_ONE } from './types';
 
 export class TypeCheckError extends Error {
@@ -395,7 +395,8 @@ export class TypeChecker {
   }
 
   private inferIfExpr(expr: AST.IfExpr, contextType: Types.Type): Types.Type {
-    const condType = this.inferExpr(expr.condition, contextType);
+    // Type check condition (not used but ensures it's valid)
+    this.inferExpr(expr.condition, contextType);
     const thenType = this.inferExpr(expr.thenExpr, contextType);
     const elseType = this.inferExpr(expr.elseExpr, contextType);
 

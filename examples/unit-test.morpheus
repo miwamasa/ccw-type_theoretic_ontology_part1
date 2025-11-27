@@ -1,0 +1,16 @@
+// Unit test
+unit kWh
+unit kg
+unit kgCO2
+
+schema Input {
+  value: Int
+}
+
+schema Output {
+  result: Int
+}
+
+transform Test: Input -> Output {
+  result <- $.value
+}

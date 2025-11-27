@@ -1,7 +1,5 @@
 // Morpheus Intermediate Representation (MIR)
 
-import { Unit } from '../analyzer/types';
-
 // MIR Program
 export interface MIRProgram {
   schemas: Map<string, MIRSchema>;
