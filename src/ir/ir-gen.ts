@@ -7,6 +7,7 @@ import { SymbolTable } from '../analyzer/scope';
 export class IRGenerator {
   private program: MIR.MIRProgram;
   private tempCounter = 0;
+  private currentInstructions: MIR.MIRInstruction[] = [];
 
   constructor(_symbolTable: SymbolTable) {
     // symbolTable is not used in this simplified implementation
@@ -127,12 +128,13 @@ export class IRGenerator {
   }
 
   private generateTransformBody(decl: AST.TransformDecl): MIR.MIRBlock {
-    const instructions: MIR.MIRInstruction[] = [];
+    // Reset instruction list for this transform
+    this.currentInstructions = [];
 
     for (const rule of decl.rules) {
       const value = this.generateExpr(rule.sourceExpr);
 
-      instructions.push({
+      this.currentInstructions.push({
         kind: 'FieldSet',
         field: rule.targetPath.join('.'),
         value,
@@ -140,7 +142,7 @@ export class IRGenerator {
     }
 
     return {
-      instructions,
+      instructions: this.currentInstructions,
       result: { kind: 'TargetRef', field: '' },
     };
   }
@@ -186,22 +188,42 @@ export class IRGenerator {
 
   private generatePathExpr(expr: AST.PathExpr): MIR.MIRValue {
     if (expr.segments.length === 0) {
+      // Just `$` refers to the entire source object
       return { kind: 'SourceRef' };
     }
 
-    // Simplified: just return a variable reference
-    // In a full implementation, we would generate field access instructions
-    const fieldPath = expr.segments
-      .map((s) => (s.kind === 'FieldAccess' ? s.field : ''))
-      .join('.');
+    // For path like $.name or $.person.age, generate field access instructions
+    let currentValue: MIR.MIRValue = { kind: 'SourceRef' };
 
-    return { kind: 'Var', name: `$${fieldPath}` };
+    for (const segment of expr.segments) {
+      if (segment.kind === 'FieldAccess') {
+        const temp = this.freshTemp();
+        this.currentInstructions.push({
+          kind: 'FieldGet',
+          target: temp,
+          object: currentValue,
+          field: segment.field,
+        });
+        currentValue = { kind: 'Var', name: temp };
+      }
+    }
+
+    return currentValue;
   }
 
-  private generateBinaryExpr(_expr: AST.BinaryExpr): MIR.MIRValue {
-    // Simplified: return a temp variable
-    // In a full implementation, we would generate the instruction
+  private generateBinaryExpr(expr: AST.BinaryExpr): MIR.MIRValue {
+    const left = this.generateExpr(expr.left);
+    const right = this.generateExpr(expr.right);
     const temp = this.freshTemp();
+
+    this.currentInstructions.push({
+      kind: 'BinOp',
+      target: temp,
+      op: expr.op,
+      left,
+      right,
+    });
+
     return { kind: 'Var', name: temp };
   }
 
