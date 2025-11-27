@@ -4,11 +4,13 @@
 
 import { Command } from 'commander';
 import * as fs from 'fs';
+import * as path from 'path';
 import { Lexer } from '../lexer/lexer';
 import { Parser } from '../parser/parser';
 import { Resolver } from '../analyzer/resolver';
 import { TypeChecker } from '../analyzer/type-checker';
 import { IRGenerator } from '../ir/ir-gen';
+import { TypeScriptCodegen } from '../codegen/typescript/ts-codegen';
 
 const program = new Command();
 
@@ -132,9 +134,35 @@ function compile(inputFile: string, options: any): void {
   console.log(`      ${mir.lookups.size} lookups`);
   console.log(`      ${mir.pipelines.size} pipelines`);
 
-  // Code generation (placeholder)
-  console.log(`\n  Code generation to ${options.target} is not yet implemented.`);
-  console.log(`  IR has been generated successfully.`);
+  // Code generation
+  if (options.target === 'typescript') {
+    console.log('\n  [6/6] Generating TypeScript code...');
+    const codegen = new TypeScriptCodegen();
+    const files = codegen.generate(mir);
+
+    // Create output directory
+    const outputDir = options.output || './output';
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Write generated files
+    let fileCount = 0;
+    for (const [filename, content] of files) {
+      const filepath = path.join(outputDir, filename);
+      const dir = path.dirname(filepath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(filepath, content, 'utf-8');
+      console.log(`    ✓ Generated ${filename}`);
+      fileCount++;
+    }
+
+    console.log(`\n✓ Successfully generated ${fileCount} file(s) in ${outputDir}/`);
+  } else {
+    console.log(`\n  Code generation for ${options.target} is not yet implemented.`);
+  }
 
   console.log('\n✓ Compilation completed successfully');
 }
