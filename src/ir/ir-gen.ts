@@ -3,15 +3,14 @@
 import * as AST from '../parser/ast';
 import * as MIR from './mir';
 import { SymbolTable } from '../analyzer/scope';
-import * as Types from '../analyzer/types';
 
 export class IRGenerator {
-  private symbolTable: SymbolTable;
   private program: MIR.MIRProgram;
   private tempCounter = 0;
 
-  constructor(symbolTable: SymbolTable) {
-    this.symbolTable = symbolTable;
+  constructor(_symbolTable: SymbolTable) {
+    // symbolTable is not used in this simplified implementation
+    // but kept for future use in full implementation
     this.program = MIR.createMIRProgram();
   }
 
@@ -199,19 +198,19 @@ export class IRGenerator {
     return { kind: 'Var', name: `$${fieldPath}` };
   }
 
-  private generateBinaryExpr(expr: AST.BinaryExpr): MIR.MIRValue {
+  private generateBinaryExpr(_expr: AST.BinaryExpr): MIR.MIRValue {
     // Simplified: return a temp variable
     // In a full implementation, we would generate the instruction
     const temp = this.freshTemp();
     return { kind: 'Var', name: temp };
   }
 
-  private generateUnaryExpr(expr: AST.UnaryExpr): MIR.MIRValue {
+  private generateUnaryExpr(_expr: AST.UnaryExpr): MIR.MIRValue {
     const temp = this.freshTemp();
     return { kind: 'Var', name: temp };
   }
 
-  private generateLookupExpr(expr: AST.LookupExpr): MIR.MIRValue {
+  private generateLookupExpr(_expr: AST.LookupExpr): MIR.MIRValue {
     const temp = this.freshTemp();
     return { kind: 'Var', name: temp };
   }

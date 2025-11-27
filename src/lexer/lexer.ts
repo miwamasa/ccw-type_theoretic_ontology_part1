@@ -3,7 +3,6 @@
 import {
   Token,
   TokenType,
-  SourceLocation,
   SourceSpan,
   KEYWORDS,
   createSourceLocation,
@@ -222,9 +221,6 @@ export class Lexer {
   }
 
   private string(): void {
-    const startLine = this.line;
-    const startColumn = this.column;
-
     while (this.peek() !== '"' && !this.isAtEnd()) {
       if (this.peek() === '\n') {
         this.line++;

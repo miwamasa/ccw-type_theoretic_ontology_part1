@@ -81,8 +81,8 @@ export class SimpleLookup<K, V> implements Lookup<K, V> {
 }
 
 export function createLookup<K, V>(
-  source: string,
-  options?: { hasDefault?: boolean }
+  _source: string,
+  _options?: { hasDefault?: boolean }
 ): Lookup<K, V> {
   // In a full implementation, we would load from the source file
   return new SimpleLookup<K, V>();
