@@ -125,7 +125,7 @@ export class Parser {
       const variantName = this.consume(TokenType.IDENTIFIER, 'Expected variant name').lexeme;
 
       let value: AST.Literal | undefined;
-      if (this.match(TokenType.EQ)) {
+      if (this.match(TokenType.ASSIGN)) {
         value = this.literal();
       }
 
@@ -170,7 +170,7 @@ export class Parser {
       dimension = this.consume(TokenType.IDENTIFIER, 'Expected dimension name').lexeme;
     }
 
-    if (this.match(TokenType.EQ)) {
+    if (this.match(TokenType.ASSIGN)) {
       expr = this.unitExpr();
     }
 

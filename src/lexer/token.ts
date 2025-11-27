@@ -57,6 +57,7 @@ export enum TokenType {
   SLASH = 'SLASH',           // /
   CARET = 'CARET',           // ^
   PERCENT = 'PERCENT',       // %
+  ASSIGN = 'ASSIGN',         // =
   EQ = 'EQ',                 // ==
   NEQ = 'NEQ',               // !=
   LT = 'LT',                 // <

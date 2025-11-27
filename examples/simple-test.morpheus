@@ -1,0 +1,15 @@
+// Simple test
+schema Person {
+  name: String
+  age: Int
+}
+
+schema PersonDTO {
+  fullName: String
+  ageYears: Int
+}
+
+transform PersonToDTO: Person -> PersonDTO {
+  fullName <- $.name
+  ageYears <- $.age
+}

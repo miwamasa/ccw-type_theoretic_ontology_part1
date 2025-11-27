@@ -95,7 +95,7 @@ export class Lexer {
         } else if (this.match('>')) {
           this.addToken(TokenType.FAT_ARROW, '=>');
         } else {
-          this.error('Unexpected character \'=\'. Did you mean \'==\' or \'=>\'?');
+          this.addToken(TokenType.ASSIGN, '=');
         }
         break;
 
