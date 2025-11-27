@@ -44,6 +44,61 @@ export class TypeScriptCodegen {
     this.emit('}');
     this.emit('');
 
+    // Quantity type guard
+    this.emit('// Quantity type guard');
+    this.emit('export function isQuantity(value: any): value is Quantity<any> {');
+    this.emit('  return typeof value === \'object\' && value !== null && \'value\' in value && \'unit\' in value;');
+    this.emit('}');
+    this.emit('');
+
+    // Quantity arithmetic operations
+    this.emit('// Quantity arithmetic operations');
+    this.emit('export function multiplyValue(a: any, b: any): any {');
+    this.emit('  if (isQuantity(a) && isQuantity(b)) {');
+    this.emit('    // Quantity * Quantity - unit multiplication would require unit system');
+    this.emit('    // For now, return a Quantity with combined unit name');
+    this.emit('    return { value: a.value * b.value, unit: `${a.unit}_times_${b.unit}` };');
+    this.emit('  } else if (isQuantity(a)) {');
+    this.emit('    // Quantity * scalar');
+    this.emit('    return { value: a.value * b, unit: a.unit };');
+    this.emit('  } else if (isQuantity(b)) {');
+    this.emit('    // scalar * Quantity');
+    this.emit('    return { value: a * b.value, unit: b.unit };');
+    this.emit('  } else {');
+    this.emit('    // scalar * scalar');
+    this.emit('    return a * b;');
+    this.emit('  }');
+    this.emit('}');
+    this.emit('');
+    this.emit('export function divideValue(a: any, b: any): any {');
+    this.emit('  if (isQuantity(a) && isQuantity(b)) {');
+    this.emit('    return { value: a.value / b.value, unit: `${a.unit}_per_${b.unit}` };');
+    this.emit('  } else if (isQuantity(a)) {');
+    this.emit('    return { value: a.value / b, unit: a.unit };');
+    this.emit('  } else if (isQuantity(b)) {');
+    this.emit('    return { value: a / b.value, unit: `per_${b.unit}` };');
+    this.emit('  } else {');
+    this.emit('    return a / b;');
+    this.emit('  }');
+    this.emit('}');
+    this.emit('');
+    this.emit('export function addValue(a: any, b: any): any {');
+    this.emit('  if (isQuantity(a) && isQuantity(b)) {');
+    this.emit('    return { value: a.value + b.value, unit: a.unit };');
+    this.emit('  } else {');
+    this.emit('    return a + b;');
+    this.emit('  }');
+    this.emit('}');
+    this.emit('');
+    this.emit('export function subtractValue(a: any, b: any): any {');
+    this.emit('  if (isQuantity(a) && isQuantity(b)) {');
+    this.emit('    return { value: a.value - b.value, unit: a.unit };');
+    this.emit('  } else {');
+    this.emit('    return a - b;');
+    this.emit('  }');
+    this.emit('}');
+    this.emit('');
+
     // Enums
     for (const [_name, enumDef] of program.enums) {
       this.generateEnum(enumDef);
@@ -216,9 +271,14 @@ export class TypeScriptCodegen {
       case 'BinOp':
         const left = this.generateValue(instr.left);
         const right = this.generateValue(instr.right);
-        // Note: Quantity arithmetic is not fully implemented yet
-        // This will fail at runtime if operands are Quantity objects
-        this.emit(`const ${instr.target} = ${left} ${instr.op} ${right};`);
+        // Use runtime helper functions for Quantity arithmetic
+        const opFunc = this.getArithmeticFunction(instr.op);
+        if (opFunc) {
+          this.emit(`const ${instr.target} = Types.${opFunc}(${left}, ${right});`);
+        } else {
+          // Fallback for other operators
+          this.emit(`const ${instr.target} = ${left} ${instr.op} ${right};`);
+        }
         break;
 
       case 'Lookup':
@@ -285,9 +345,9 @@ export class TypeScriptCodegen {
 
     // Generate mock lookup tables
     if (program.lookups.size > 0) {
-      this.emit('// Mock lookup tables');
+      this.emit('// Mock lookup tables (declared globally for transforms)');
       for (const [name, _lookup] of program.lookups) {
-        this.emit(`const ${name}: any = {`);
+        this.emit(`(globalThis as any).${name} = {`);
         this.emit(`  'electricity': { value: 0.5, unit: 'kgCO2_per_kWh' },`);
         this.emit(`  'default': { value: 0.0, unit: 'kgCO2_per_kWh' }`);
         this.emit(`};`);
@@ -420,6 +480,21 @@ export class TypeScriptCodegen {
   }
 
   // ========== Helper Methods ==========
+
+  private getArithmeticFunction(op: string): string | null {
+    switch (op) {
+      case '*':
+        return 'multiplyValue';
+      case '/':
+        return 'divideValue';
+      case '+':
+        return 'addValue';
+      case '-':
+        return 'subtractValue';
+      default:
+        return null;
+    }
+  }
 
   private emit(line: string): void {
     if (line === '') {
