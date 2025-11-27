@@ -24,6 +24,9 @@ export class TypeScriptCodegen {
     // package.json - Package configuration
     files.set('package.json', this.generatePackageJson());
 
+    // test.ts - Test file
+    files.set('test.ts', this.generateTest(program));
+
     return files;
   }
 
@@ -71,7 +74,7 @@ export class TypeScriptCodegen {
     this.indent++;
 
     for (const field of schema.fields) {
-      const tsType = this.mirTypeToTS(field.type);
+      const tsType = this.mirTypeToTSLocal(field.type);
       this.emit(`${field.name}: ${tsType};`);
     }
 
@@ -97,6 +100,29 @@ export class TypeScriptCodegen {
         return `[${type.elements.map(e => this.mirTypeToTS(e)).join(', ')}]`;
       case 'Union':
         return type.members.map(m => this.mirTypeToTS(m)).join(' | ');
+      default:
+        return 'unknown';
+    }
+  }
+
+  private mirTypeToTSLocal(type: MIR.MIRType): string {
+    switch (type.kind) {
+      case 'Primitive':
+        return this.primitiveToTS(type.name);
+      case 'Schema':
+        return type.name;
+      case 'Enum':
+        return type.name;
+      case 'Array':
+        return `${this.mirTypeToTSLocal(type.element)}[]`;
+      case 'Optional':
+        return `${this.mirTypeToTSLocal(type.inner)} | null`;
+      case 'Quantity':
+        return `Quantity<'${type.unit}'>`;
+      case 'Tuple':
+        return `[${type.elements.map(e => this.mirTypeToTSLocal(e)).join(', ')}]`;
+      case 'Union':
+        return type.members.map(m => this.mirTypeToTSLocal(m)).join(' | ');
       default:
         return 'unknown';
     }
@@ -130,6 +156,15 @@ export class TypeScriptCodegen {
     this.emit('');
     this.emit('import * as Types from \'./types\';');
     this.emit('');
+
+    // Declare lookup tables (to be populated at runtime)
+    if (program.lookups.size > 0) {
+      this.emit('// Lookup tables (populate these before using transforms)');
+      for (const [name, _lookup] of program.lookups) {
+        this.emit(`declare const ${name}: any;`);
+      }
+      this.emit('');
+    }
 
     for (const [_name, transform] of program.transforms) {
       this.generateTransform(transform);
@@ -181,7 +216,19 @@ export class TypeScriptCodegen {
       case 'BinOp':
         const left = this.generateValue(instr.left);
         const right = this.generateValue(instr.right);
+        // Note: Quantity arithmetic is not fully implemented yet
+        // This will fail at runtime if operands are Quantity objects
         this.emit(`const ${instr.target} = ${left} ${instr.op} ${right};`);
+        break;
+
+      case 'Lookup':
+        const keyValue = this.generateValue(instr.key);
+        if (instr.default) {
+          const defaultValue = this.generateValue(instr.default);
+          this.emit(`const ${instr.target} = ${instr.table}[${keyValue}] ?? ${defaultValue};`);
+        } else {
+          this.emit(`const ${instr.target} = ${instr.table}[${keyValue}];`);
+        }
         break;
 
       default:
@@ -223,6 +270,112 @@ export class TypeScriptCodegen {
     this.emit('export * from \'./transforms\';');
 
     return this.output.join('\n');
+  }
+
+  // ========== Test Generation ==========
+
+  private generateTest(program: MIR.MIRProgram): string {
+    this.output = [];
+
+    this.emit('// Auto-generated test file');
+    this.emit('');
+    this.emit('import * as Types from \'./types\';');
+    this.emit('import * as Transforms from \'./transforms\';');
+    this.emit('');
+
+    // Generate mock lookup tables
+    if (program.lookups.size > 0) {
+      this.emit('// Mock lookup tables');
+      for (const [name, _lookup] of program.lookups) {
+        this.emit(`const ${name}: any = {`);
+        this.emit(`  'electricity': { value: 0.5, unit: 'kgCO2_per_kWh' },`);
+        this.emit(`  'default': { value: 0.0, unit: 'kgCO2_per_kWh' }`);
+        this.emit(`};`);
+      }
+      this.emit('');
+    }
+
+    // Generate test data for each transform
+    for (const [name, transform] of program.transforms) {
+      this.generateTransformTest(name, transform, program);
+      this.emit('');
+    }
+
+    return this.output.join('\n');
+  }
+
+  private generateTransformTest(name: string, transform: MIR.MIRTransform, program: MIR.MIRProgram): void {
+    // Generate sample source data
+    this.emit(`// Test for ${name}`);
+    const sourceData = this.generateSampleData(transform.sourceType, program);
+    this.emit(`const testData_${name} = ${sourceData};`);
+    this.emit('');
+
+    // Call the transform
+    this.emit(`const result_${name} = Transforms.${name}(testData_${name});`);
+    this.emit('');
+
+    // Output results
+    this.emit(`console.log('=== ${name} ===');`);
+    this.emit(`console.log('Input:', testData_${name});`);
+    this.emit(`console.log('Output:', result_${name});`);
+    this.emit(`console.log('✓ ${name} executed successfully!');`);
+    this.emit(`console.log('');`);
+  }
+
+  private generateSampleData(type: MIR.MIRType, program: MIR.MIRProgram): string {
+    switch (type.kind) {
+      case 'Primitive':
+        return this.generatePrimitiveSample(type.name);
+
+      case 'Schema':
+        const schema = program.schemas.get(type.name);
+        if (!schema) return '{}';
+
+        const fields: string[] = [];
+        for (const field of schema.fields) {
+          const value = this.generateSampleData(field.type, program);
+          fields.push(`${field.name}: ${value}`);
+        }
+        return `{ ${fields.join(', ')} }`;
+
+      case 'Array':
+        const elementSample = this.generateSampleData(type.element, program);
+        return `[${elementSample}]`;
+
+      case 'Optional':
+        return this.generateSampleData(type.inner, program);
+
+      case 'Enum':
+        const enumDef = program.enums.get(type.name);
+        if (enumDef && enumDef.variants.length > 0) {
+          return `Types.${type.name}.${enumDef.variants[0]}`;
+        }
+        return `''`;
+
+      case 'Quantity':
+        return `{ value: 100, unit: '${type.unit}' as '${type.unit}' }`;
+
+      default:
+        return 'null';
+    }
+  }
+
+  private generatePrimitiveSample(name: string): string {
+    switch (name) {
+      case 'String':
+        return `'Sample String'`;
+      case 'Int':
+      case 'Float':
+        return '42';
+      case 'Bool':
+        return 'true';
+      case 'Date':
+      case 'DateTime':
+        return 'new Date()';
+      default:
+        return 'null';
+    }
   }
 
   // ========== Configuration Files ==========

@@ -232,8 +232,18 @@ export class IRGenerator {
     return { kind: 'Var', name: temp };
   }
 
-  private generateLookupExpr(_expr: AST.LookupExpr): MIR.MIRValue {
+  private generateLookupExpr(expr: AST.LookupExpr): MIR.MIRValue {
     const temp = this.freshTemp();
+    const key = this.generateExpr(expr.key);
+
+    this.currentInstructions.push({
+      kind: 'Lookup',
+      target: temp,
+      table: expr.table,
+      key,
+      default: expr.defaultValue ? this.generateExpr(expr.defaultValue) : undefined,
+    });
+
     return { kind: 'Var', name: temp };
   }
 
