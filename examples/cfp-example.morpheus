@@ -1,0 +1,39 @@
+// Carbon Footprint Calculation Example
+// From Morpheus DSL Specification
+
+// Define units
+unit kWh
+unit kg
+unit kgCO2
+unit kgCO2_per_kWh = kgCO2 / kWh
+
+// Source schema
+schema ProductionRecord {
+  productId: String
+  electricityUsage: Quantity<kWh>
+  materials: [MaterialUsage]
+}
+
+schema MaterialUsage {
+  code: String
+  weight: Quantity<kg>
+}
+
+// Target schema
+schema CFPResult {
+  productId: String
+  totalEmission: Quantity<kgCO2>
+}
+
+// Lookup table
+lookup EmissionFactor {
+  key: String
+  value: Quantity<kgCO2_per_kWh>
+  source: "emission_factors.csv"
+}
+
+// Transform
+transform ProductionToCFP: ProductionRecord -> CFPResult {
+  productId <- $.productId
+  totalEmission <- $.electricityUsage * lookup(EmissionFactor, "electricity")
+}
