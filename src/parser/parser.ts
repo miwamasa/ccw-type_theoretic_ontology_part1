@@ -853,8 +853,7 @@ export class Parser {
     }
 
     // Lookup function
-    if (this.check(TokenType.IDENTIFIER) && this.peek().lexeme === 'lookup') {
-      this.advance();
+    if (this.match(TokenType.LOOKUP)) {
       this.consume(TokenType.LPAREN, 'Expected \'(\' after \'lookup\'');
       const table = this.consume(TokenType.IDENTIFIER, 'Expected table name').lexeme;
       this.consume(TokenType.COMMA, 'Expected \',\' after table name');
