@@ -1,0 +1,26 @@
+// AI-generated transform (confidence scores in comments)
+transform FactoryProductionDataToGHGEmissionsReport: FactoryProductionData -> GHGEmissionsReport {
+  // Type compatible: String to String - direct mapping preserves type (confidence: 100%)
+  facilityIdentifier <- $.factoryId
+  // Type compatible: String constant. No source field available, using static methodology description with proper ASCII characters only (confidence: 100%)
+  calculationMethodology <- "GHG Protocol - Emission factors: electricity 0.5 kgCO2e/kWh, natural gas 2.0 kgCO2e/m3, diesel 2.7 kgCO2e/L"
+  // Type compatible: Bool constant. No source field available for verification status, defaulting to false (confidence: 100%)
+  verified <- false
+  // Type compatible: Float to Float. Converts m3 to tCO2e using emission factor 2.0 kgCO2e/m3, then kg to t (divide by 1000). Dimensional analysis: m3 * (kgCO2e/m3) * (t/kg) = tCO2e (confidence: 95%)
+  scope1NaturalGas <- ($.naturalGasUsage * 2.0) / 1000
+  // Type compatible: Float to Float. Converts L to tCO2e using emission factor 2.7 kgCO2e/L, then kg to t (divide by 1000). Dimensional analysis: L * (kgCO2e/L) * (t/kg) = tCO2e (confidence: 95%)
+  scope1DieselCombustion <- ($.dieselFuelUsage * 2.7) / 1000
+  // Type compatible: Float to Float. Sum of scope 1 emissions from natural gas and diesel combustion. Both converted to tCO2e and summed. Dimensional analysis: tCO2e + tCO2e = tCO2e (confidence: 95%)
+  scope1DirectEmissions <- (($.naturalGasUsage * 2.0) / 1000) + (($.dieselFuelUsage * 2.7) / 1000)
+  // Type compatible: Float to Float. Converts kWh to tCO2e using emission factor 0.5 kgCO2e/kWh, then kg to t (divide by 1000). Dimensional analysis: kWh * (kgCO2e/kWh) * (t/kg) = tCO2e (confidence: 95%)
+  scope2Electricity <- ($.electricityUsage * 0.5) / 1000
+  // Type compatible: Float to Float. Scope 2 consists of electricity emissions only. Converts kWh to tCO2e using emission factor 0.5 kgCO2e/kWh, then kg to t. Dimensional analysis: kWh * (kgCO2e/kWh) * (t/kg) = tCO2e (confidence: 95%)
+  scope2IndirectEmissions <- ($.electricityUsage * 0.5) / 1000
+  // Type compatible: Float to Float. Sum of all scope 1 and scope 2 emissions (scope 3 not calculable from available data). All converted to tCO2e. Dimensional analysis: tCO2e + tCO2e + tCO2e = tCO2e (confidence: 95%)
+  totalEmissions <- (($.electricityUsage * 0.5) / 1000) + (($.naturalGasUsage * 2.0) / 1000) + (($.dieselFuelUsage * 2.7) / 1000)
+  // Type compatible: Float to Float. Total emissions divided by production volume. Conditional handles division by zero. Dimensional analysis: tCO2e / units = tCO2e per unit (confidence: 90%)
+  emissionsPerUnit <- if $.productionVolume > 0.0 then ((($.electricityUsage * 0.5) / 1000.0) + (($.naturalGasUsage * 2.0) / 1000.0) + (($.dieselFuelUsage * 2.7) / 1000.0)) / $.productionVolume else 0.0
+  // Type compatible: Float to Float. Total emissions divided by operating hours. Conditional handles division by zero. Dimensional analysis: tCO2e / hours = tCO2e per hour (confidence: 90%)
+  emissionsPerHour <- if $.operatingHours > 0.0 then ((($.electricityUsage * 0.5) / 1000.0) + (($.naturalGasUsage * 2.0) / 1000.0) + (($.dieselFuelUsage * 2.7) / 1000.0)) / $.operatingHours else 0.0
+  // Note: reportingPeriod field skipped - requires String to Date conversion function not yet available in Morpheus
+}
