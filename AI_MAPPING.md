@@ -308,6 +308,46 @@ curl -I https://api.anthropic.com/v1/messages
 curl -x http://proxy.example.com:8080 -I https://api.anthropic.com/v1/messages
 ```
 
+#### SSL証明書エラー
+
+```
+Error: unable to get local issuer certificate
+```
+
+**原因**:
+- 企業のプロキシがSSL検査（SSL interception）を行っている
+- 自己署名証明書を使用している
+- Node.jsが企業のCA証明書を認識していない
+
+**対処法**:
+
+1. **一時的な回避策**（本番環境では使用しないでください）:
+```bash
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+```
+⚠️ これはSSL証明書の検証を無効化します。セキュリティリスクがあるため、テスト目的のみに使用してください。
+
+2. **推奨される解決策** - 企業のCA証明書を追加:
+```bash
+# IT部門から企業のCA証明書ファイルを入手
+export NODE_EXTRA_CA_CERTS=/path/to/corporate-ca.crt
+```
+
+3. **証明書の取得方法**:
+```bash
+# OpenSSLで証明書を確認
+openssl s_client -showcerts -connect api.anthropic.com:443 < /dev/null
+
+# プロキシ経由の場合
+openssl s_client -showcerts -proxy proxy.example.com:8080 -connect api.anthropic.com:443 < /dev/null
+```
+
+4. **Windows環境の場合**:
+```bash
+# PowerShellで証明書をエクスポート
+certutil -enterprise -addstore Root C:\path\to\corporate-ca.crt
+```
+
 #### サーバーエラー
 
 ```

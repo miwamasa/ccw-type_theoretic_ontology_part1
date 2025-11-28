@@ -162,6 +162,18 @@ Provide only the JSON array, no additional text.`;
       console.log(`\n🔌 Proxy: Not configured (using direct connection)`);
     }
 
+    // Check for SSL/TLS settings
+    const tlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    const extraCerts = process.env.NODE_EXTRA_CA_CERTS;
+
+    console.log(`\n🔒 SSL/TLS Settings:`);
+    console.log(`   NODE_TLS_REJECT_UNAUTHORIZED: ${tlsReject || 'not set (default: 1)'}`);
+    if (extraCerts) {
+      console.log(`   NODE_EXTRA_CA_CERTS: ${extraCerts}`);
+    } else {
+      console.log(`   NODE_EXTRA_CA_CERTS: not set`);
+    }
+
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -193,6 +205,25 @@ Provide only the JSON array, no additional text.`;
         console.error(`   Model: ${this.model}`);
 
         if (error instanceof Error) {
+          // Check for SSL certificate errors (not retryable)
+          const isCertError = error.message.includes('unable to get local issuer certificate') ||
+                            error.message.includes('certificate') ||
+                            error.message.includes('CERT_') ||
+                            error.message.includes('self signed certificate');
+
+          if (isCertError) {
+            console.error(`\n⚠️  SSL Certificate Error Detected!`);
+            console.error(`\nThis usually happens in corporate environments with SSL inspection.`);
+            console.error(`\n💡 Solutions:`);
+            console.error(`   1. Temporary workaround (NOT for production):`);
+            console.error(`      export NODE_TLS_REJECT_UNAUTHORIZED=0`);
+            console.error(`\n   2. Proper solution - Add your corporate CA certificate:`);
+            console.error(`      export NODE_EXTRA_CA_CERTS=/path/to/corporate-ca.crt`);
+            console.error(`\n   3. Get the certificate from your IT department or:`);
+            console.error(`      openssl s_client -showcerts -connect api.anthropic.com:443 < /dev/null`);
+            throw new Error(`SSL Certificate Verification Failed: ${error.message}\n\nSee above for solutions.`);
+          }
+
           lastError = new Error(`Failed to call Anthropic API: ${error.message}\nModel: ${this.model}\nURL: ${url}\nError Type: ${error.constructor.name}`);
 
           // Check if error is retryable (network errors like ECONNRESET, ETIMEDOUT, etc.)
