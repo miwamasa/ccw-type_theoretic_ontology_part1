@@ -161,6 +161,50 @@ node dist/cli/index.js ai-map examples/ai-mapping-test.morpheus \
   --min-confidence 0.6
 ```
 
+### 例4: 複雑なドメイン変換 - GHG排出量レポート
+
+工場の生産管理データから温室効果ガス（GHG）排出量レポートへの変換。単位変換、排出係数の適用、集約計算を含む複雑な変換の例：
+
+```bash
+node dist/cli/index.js ai-map examples/ghg-emissions.morpheus \
+  --source FactoryProductionData \
+  --target GHGEmissionsReport \
+  --domain "Manufacturing GHG emissions reporting. Convert energy consumption \
+(electricity in kWh, natural gas in m³, diesel in L) to CO2 equivalent emissions (tCO2e). \
+Use emission factors: electricity 0.5 kgCO2e/kWh, natural gas 2.0 kgCO2e/m³, diesel 2.7 kgCO2e/L. \
+Calculate total emissions and emissions intensity." \
+  -o examples/ghg-transform.morpheus
+```
+
+**生成される高度な変換の例**:
+```morpheus
+// 単位変換と排出係数の適用
+scope2Electricity <- ($.electricityUsage * 0.5) / 1000
+scope1NaturalGas <- ($.naturalGasUsage * 2.0) / 1000
+scope1DieselCombustion <- ($.dieselFuelUsage * 2.7) / 1000
+
+// 複数フィールドの集約
+scope1DirectEmissions <- (($.naturalGasUsage * 2.0) + ($.dieselFuelUsage * 2.7)) / 1000
+totalEmissions <- (($.electricityUsage * 0.5) + ($.naturalGasUsage * 2.0) + ($.dieselFuelUsage * 2.7)) / 1000
+
+// 原単位の計算
+emissionsPerUnit <- (totalEmissions) / $.productionVolume
+emissionsPerHour <- (totalEmissions) / $.operatingHours
+
+// 静的値とメタデータ
+calculationMethodology <- 'GHG Protocol - Emission factors: ...'
+verified <- false
+```
+
+**特徴**:
+- ✅ **単位変換**: kWh, m³, L → tCO2e
+- ✅ **排出係数の適用**: ドメイン知識に基づく係数の自動適用
+- ✅ **複雑な数式**: 複数フィールドの集約と計算
+- ✅ **原単位計算**: 生産量・稼働時間あたりの排出量
+- ✅ **信頼度の区別**: 完全なデータ(100%)と不完全なデータ(50-60%)を識別
+
+📊 **結果**: 15フィールド中15フィールドをマッピング、平均信頼度90%
+
 ## 利用可能なClaudeモデル
 
 ### モデルの指定方法
