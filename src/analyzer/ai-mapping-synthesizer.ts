@@ -125,25 +125,33 @@ Provide only the JSON array, no additional text.`;
     const maxTokens = options.maxTokens || 4000;
     const temperature = options.temperature || 0.2;
 
-    const response = await fetch(`${this.baseURL}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: this.model,
-        max_tokens: maxTokens,
-        temperature: temperature,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
-    });
+    let response;
+    try {
+      response = await fetch(`${this.baseURL}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: maxTokens,
+          temperature: temperature,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        })
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to call Anthropic API: ${error.message}\nModel: ${this.model}\nURL: ${this.baseURL}/messages`);
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const error = await response.text();
