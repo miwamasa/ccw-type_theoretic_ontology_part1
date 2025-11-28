@@ -12,6 +12,13 @@ Morpheus DSLは、Anthropic Claudeを使用した自動スキーママッピン�
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
+
+# オプション: デフォルトのモデルを指定（エイリアス使用可能）
+export ANTHROPIC_MODEL="sonnet"    # claude-3-5-sonnet-20241022
+# または
+export ANTHROPIC_MODEL="haiku"     # claude-3-haiku-20240307
+# または
+export ANTHROPIC_MODEL="opus"      # claude-3-opus-20240229
 ```
 
 ### 3. 依存関係のインストール
@@ -139,22 +146,63 @@ node dist/cli/index.js ai-map examples/ai-mapping-test.morpheus \
 ### 例3: モデルと信頼度の調整
 
 ```bash
-# より高度なモデルを使用
+# より高度なモデルを使用（エイリアスで指定）
 node dist/cli/index.js ai-map examples/ai-mapping-test.morpheus \
   --source CustomerRecord \
   --target UserProfile \
-  --model claude-3-opus-20240229 \
+  --model opus \
   --min-confidence 0.8
+
+# または環境変数で指定
+export ANTHROPIC_MODEL="haiku"
+node dist/cli/index.js ai-map examples/ai-mapping-test.morpheus \
+  --source CustomerRecord \
+  --target UserProfile \
+  --min-confidence 0.6
 ```
 
 ## 利用可能なClaudeモデル
 
+### モデルの指定方法
+
+モデルは以下の3つの方法で指定できます（優先順位順）：
+1. **CLIオプション**: `--model` オプションで指定
+2. **環境変数**: `ANTHROPIC_MODEL` 環境変数
+3. **デフォルト**: `claude-3-5-sonnet-20241022`
+
+### モデルエイリアス
+
+簡単な名前でモデルを指定できます：
+
+| エイリアス | 実際のモデル |
+|-----------|------------|
+| `sonnet` | `claude-3-5-sonnet-20241022` |
+| `sonnet-3.5` | `claude-3-5-sonnet-20241022` |
+| `sonnet-3` | `claude-3-sonnet-20240229` |
+| `opus` | `claude-3-opus-20240229` |
+| `haiku` | `claude-3-haiku-20240307` |
+
+使用例：
+```bash
+# エイリアスを使用
+export ANTHROPIC_MODEL="haiku"
+node dist/cli/index.js ai-map examples/ai-mapping-test.morpheus --source CustomerRecord --target UserProfile
+
+# CLIオプションでオーバーライド
+node dist/cli/index.js ai-map examples/ai-mapping-test.morpheus \
+  --source CustomerRecord \
+  --target UserProfile \
+  --model opus
+```
+
+### モデル比較
+
 | モデル | 説明 | 推奨用途 |
 |-------|------|---------|
-| `claude-3-5-sonnet-20241022` | 最新のSonnetモデル（推奨） | バランスの取れたパフォーマンス |
-| `claude-3-opus-20240229` | 最も高性能なモデル | 複雑なマッピング |
-| `claude-3-sonnet-20240229` | 前世代のSonnet | コスト重視 |
-| `claude-3-haiku-20240307` | 高速・低コスト | シンプルなマッピング |
+| `claude-3-5-sonnet-20241022` (`sonnet`) | 最新のSonnetモデル（推奨） | バランスの取れたパフォーマンス |
+| `claude-3-opus-20240229` (`opus`) | 最も高性能なモデル | 複雑なマッピング |
+| `claude-3-sonnet-20240229` (`sonnet-3`) | 前世代のSonnet | コスト重視 |
+| `claude-3-haiku-20240307` (`haiku`) | 高速・低コスト | シンプルなマッピング |
 
 ## 料金の目安
 

@@ -191,6 +191,19 @@ function compile(inputFile: string, options: any): void {
   console.log('\n✓ Compilation completed successfully');
 }
 
+// Model name resolver - supports aliases and full model names
+function resolveModelName(modelInput: string): string {
+  const aliases: { [key: string]: string } = {
+    'sonnet': 'claude-3-5-sonnet-20241022',
+    'opus': 'claude-3-opus-20240229',
+    'haiku': 'claude-3-haiku-20240307',
+    'sonnet-3': 'claude-3-sonnet-20240229',
+    'sonnet-3.5': 'claude-3-5-sonnet-20241022',
+  };
+
+  return aliases[modelInput.toLowerCase()] || modelInput;
+}
+
 async function aiMapCommand(inputFile: string, options: any): Promise<void> {
   // Check for API key
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -199,6 +212,12 @@ async function aiMapCommand(inputFile: string, options: any): Promise<void> {
     console.error('Please set it with: export ANTHROPIC_API_KEY="your-api-key"');
     process.exit(1);
   }
+
+  // Determine model to use (priority: CLI option > env variable > default)
+  const modelInput = options.model ||
+                     process.env.ANTHROPIC_MODEL ||
+                     'claude-3-5-sonnet-20241022';
+  const model = resolveModelName(modelInput);
 
   // Read and parse input file
   const source = fs.readFileSync(inputFile, 'utf-8');
@@ -252,11 +271,11 @@ async function aiMapCommand(inputFile: string, options: any): Promise<void> {
   // Initialize AI synthesizer
   const synthesizer = new AIMappingSynthesizer({
     apiKey,
-    model: options.model
+    model
   });
 
   // Generate mappings
-  console.log(`\n🤖 Calling Claude AI (${options.model})...`);
+  console.log(`\n🤖 Calling Claude AI (${model})...`);
 
   const mappings = await synthesizer.synthesize(
     sourceSchema,
