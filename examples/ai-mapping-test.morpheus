@@ -1,0 +1,41 @@
+// Test file for AI-powered schema mapping
+
+// Source: Customer database schema
+schema CustomerRecord {
+  customerId: String
+  firstName: String
+  lastName: String
+  emailAddress: String
+  phoneNumber: String
+  registrationDate: DateTime
+  loyaltyPoints: Int
+  accountStatus: String
+}
+
+// Target: User profile API schema
+schema UserProfile {
+  id: String
+  fullName: String
+  email: String
+  phone: String?
+  memberSince: Date
+  points: Int
+  active: Bool
+}
+
+// Another example: Product data
+schema ProductData {
+  productCode: String
+  productName: String
+  unitPrice: Float
+  stockQuantity: Int
+  categoryName: String
+}
+
+schema ProductDTO {
+  code: String
+  name: String
+  price: Float
+  inStock: Bool
+  category: String
+}
