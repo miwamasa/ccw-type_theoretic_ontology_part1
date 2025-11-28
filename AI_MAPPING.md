@@ -266,11 +266,55 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ### ネットワークエラー
 
+#### 接続エラー（ECONNRESET, fetch failed）
+
+```
+Error: Failed to call Anthropic API: fetch failed
+Cause: Error: read ECONNRESET
+```
+
+**原因**:
+- ネットワークの一時的な問題
+- プロキシやファイアウォールの設定
+- タイムアウト
+
+**対処法**:
+
+1. **自動リトライ**: 3回まで自動的にリトライします（1秒、2秒、4秒の間隔）
+
+2. **プロキシ設定**: プロキシ経由の場合、環境変数を設定：
+```bash
+export HTTP_PROXY="http://proxy.example.com:8080"
+export HTTPS_PROXY="http://proxy.example.com:8080"
+export NO_PROXY="localhost,127.0.0.1"
+```
+
+3. **認証付きプロキシ**:
+```bash
+export HTTPS_PROXY="http://username:password@proxy.example.com:8080"
+```
+
+4. **プロキシ除外**: Anthropic API を直接接続する場合：
+```bash
+export NO_PROXY="api.anthropic.com"
+```
+
+5. **ネットワーク確認**:
+```bash
+# 接続テスト
+curl -I https://api.anthropic.com/v1/messages
+
+# プロキシ経由でテスト
+curl -x http://proxy.example.com:8080 -I https://api.anthropic.com/v1/messages
+```
+
+#### サーバーエラー
+
 ```
 Error: Anthropic API error: 500
 ```
 
-→ しばらく待ってから再試行してください。
+→ しばらく待ってから再試行してください（自動リトライされます）。
 
 ### マッピングが見つからない
 
