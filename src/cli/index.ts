@@ -62,7 +62,7 @@ program
   .requiredOption('--target <schema>', 'Target schema name')
   .option('--transform <name>', 'Transform name to generate')
   .option('--domain <context>', 'Domain context for better AI understanding')
-  .option('--model <model>', 'Claude model to use', 'claude-3-5-sonnet-20241022')
+  .option('--model <model>', 'Claude model to use (default: sonnet, or set ANTHROPIC_MODEL)')
   .option('--min-confidence <score>', 'Minimum confidence score (0-1)', '0.5')
   .option('-o, --output <file>', 'Output file for generated transform')
   .action(async (file: string, options) => {
