@@ -125,28 +125,62 @@ Provide only the JSON array, no additional text.`;
     const maxTokens = options.maxTokens || 4000;
     const temperature = options.temperature || 0.2;
 
-    const response = await fetch(`${this.baseURL}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: this.model,
-        max_tokens: maxTokens,
-        temperature: temperature,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
-    });
+    const requestBody = {
+      model: this.model,
+      max_tokens: maxTokens,
+      temperature: temperature,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    };
+
+    const url = `${this.baseURL}/messages`;
+
+    console.log(`\n🔍 Debug: API Request Details`);
+    console.log(`   URL: ${url}`);
+    console.log(`   Model: ${this.model}`);
+    console.log(`   Max Tokens: ${maxTokens}`);
+    console.log(`   Temperature: ${temperature}`);
+    console.log(`   API Key: ${this.apiKey.substring(0, 20)}...${this.apiKey.slice(-4)}`);
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify(requestBody)
+      });
+    } catch (error) {
+      console.error(`\n❌ Fetch Error Details:`);
+      console.error(`   Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+      console.error(`   Error Message: ${error instanceof Error ? error.message : String(error)}`);
+      if (error instanceof Error && 'cause' in error) {
+        console.error(`   Cause: ${error.cause}`);
+      }
+      console.error(`   URL Attempted: ${url}`);
+      console.error(`   Model: ${this.model}`);
+
+      if (error instanceof Error) {
+        throw new Error(`Failed to call Anthropic API: ${error.message}\nModel: ${this.model}\nURL: ${url}\nError Type: ${error.constructor.name}`);
+      }
+      throw error;
+    }
+
+    console.log(`\n📡 Response Status: ${response.status} ${response.statusText}`);
+    console.log(`   Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}`);
 
     if (!response.ok) {
       const error = await response.text();
+      console.error(`\n❌ API Error Response:`);
+      console.error(`   Status: ${response.status} ${response.statusText}`);
+      console.error(`   Body: ${error}`);
       throw new Error(`Anthropic API error: ${response.status} ${error}`);
     }
 
