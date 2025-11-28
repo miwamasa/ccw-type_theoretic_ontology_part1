@@ -1,0 +1,132 @@
+// 工場の生産管理データからGHG（温室効果ガス）レポートへの変換例
+// これは自明ではないマッピングで、ドメイン知識とAIの理解力が必要
+
+// 工場の月次生産管理データ
+schema FactoryProductionData {
+  factoryId: String
+  month: String                    // "2024-01"形式
+  productionVolume: Float          // 生産量（トン）
+  operatingHours: Float            // 稼働時間（時間）
+
+  // エネルギー使用量
+  electricityUsage: Float          // 電力使用量（kWh）
+  naturalGasUsage: Float           // 天然ガス使用量（m³）
+  dieselFuelUsage: Float           // ディーゼル燃料使用量（L）
+
+  // 原材料
+  rawMaterialPurchased: Float      // 原材料購入量（トン）
+  packagingMaterialUsed: Float     // 包装材使用量（トン）
+
+  // 廃棄物
+  wasteGenerated: Float            // 廃棄物発生量（トン）
+  wasteRecycled: Float             // リサイクル量（トン）
+
+  // その他
+  waterConsumption: Float          // 水使用量（m³）
+  employeeCount: Int               // 従業員数
+}
+
+// GHG排出量レポート（ISO 14064準拠）
+schema GHGEmissionsReport {
+  facilityIdentifier: String
+  reportingPeriod: Date
+
+  // Scope 1: 直接排出
+  scope1DirectEmissions: Float     // tCO2e (トンCO2換算)
+  scope1NaturalGas: Float          // tCO2e
+  scope1DieselCombustion: Float    // tCO2e
+
+  // Scope 2: エネルギー起源の間接排出
+  scope2IndirectEmissions: Float   // tCO2e
+  scope2Electricity: Float         // tCO2e
+
+  // Scope 3: その他の間接排出
+  scope3OtherIndirect: Float       // tCO2e
+  scope3PurchasedGoods: Float      // tCO2e（原材料調達）
+  scope3WasteDisposal: Float       // tCO2e（廃棄物処理）
+
+  // 総排出量
+  totalEmissions: Float            // tCO2e
+
+  // 原単位
+  emissionsPerUnit: Float          // tCO2e/生産トン
+  emissionsPerHour: Float          // tCO2e/稼働時間
+
+  // メタデータ
+  calculationMethodology: String
+  verified: Bool
+}
+
+// サプライヤーの環境データ
+schema SupplierEnvironmentalData {
+  supplierId: String
+  supplierName: String
+  country: String
+  certifications: String           // "ISO14001,ISO50001"形式
+
+  // 製品のカーボンフットプリント
+  productCategory: String
+  carbonIntensity: Float           // kgCO2e/kg製品
+  renewableEnergyRatio: Float      // 0.0-1.0
+
+  // 輸送
+  averageTransportDistance: Float  // km
+  primaryTransportMode: String     // "truck", "ship", "rail"
+
+  lastUpdated: DateTime
+}
+
+// 統合されたサステナビリティレポート
+schema SustainabilityReport {
+  organizationId: String
+  reportYear: Int
+
+  // 環境パフォーマンス
+  totalGHGEmissions: Float         // tCO2e
+  ghgReductionFromBaseline: Float  // パーセンテージ
+  renewableEnergyPercentage: Float // 0-100
+
+  // 循環経済
+  recyclingRate: Float             // パーセンテージ
+  wasteToLandfill: Float           // トン
+  waterRecyclingRate: Float        // パーセンテージ
+
+  // サプライチェーン
+  sustainableSourcingRatio: Float  // パーセンテージ
+  suppliersCertified: Int          // 認証取得サプライヤー数
+
+  // 社会的側面
+  safetyIncidentRate: Float
+  employeeTurnoverRate: Float      // パーセンテージ
+
+  // コンプライアンス
+  regulatoryCompliance: Bool
+  auditedBy: String
+  publicationDate: Date
+}
+// AI-generated transform (confidence scores in comments)
+transform FactoryProductionDataToGHGEmissionsReport: FactoryProductionData -> GHGEmissionsReport {
+  // Type compatible: String to String - direct mapping preserves type (confidence: 100%)
+  facilityIdentifier <- $.factoryId
+  // Type compatible: String constant. No source field available, using static methodology description with proper ASCII characters only (confidence: 100%)
+  calculationMethodology <- "GHG Protocol - Emission factors: electricity 0.5 kgCO2e/kWh, natural gas 2.0 kgCO2e/m3, diesel 2.7 kgCO2e/L"
+  // Type compatible: Bool constant. No source field available for verification status, defaulting to false (confidence: 100%)
+  verified <- false
+  // Type compatible: Float to Float. Converts m3 to tCO2e using emission factor 2.0 kgCO2e/m3, then kg to t (divide by 1000). Dimensional analysis: m3 * (kgCO2e/m3) * (t/kg) = tCO2e (confidence: 95%)
+  scope1NaturalGas <- ($.naturalGasUsage * 2.0) / 1000
+  // Type compatible: Float to Float. Converts L to tCO2e using emission factor 2.7 kgCO2e/L, then kg to t (divide by 1000). Dimensional analysis: L * (kgCO2e/L) * (t/kg) = tCO2e (confidence: 95%)
+  scope1DieselCombustion <- ($.dieselFuelUsage * 2.7) / 1000
+  // Type compatible: Float to Float. Sum of scope 1 emissions from natural gas and diesel combustion. Both converted to tCO2e and summed. Dimensional analysis: tCO2e + tCO2e = tCO2e (confidence: 95%)
+  scope1DirectEmissions <- (($.naturalGasUsage * 2.0) / 1000) + (($.dieselFuelUsage * 2.7) / 1000)
+  // Type compatible: Float to Float. Converts kWh to tCO2e using emission factor 0.5 kgCO2e/kWh, then kg to t (divide by 1000). Dimensional analysis: kWh * (kgCO2e/kWh) * (t/kg) = tCO2e (confidence: 95%)
+  scope2Electricity <- ($.electricityUsage * 0.5) / 1000
+  // Type compatible: Float to Float. Scope 2 consists of electricity emissions only. Converts kWh to tCO2e using emission factor 0.5 kgCO2e/kWh, then kg to t. Dimensional analysis: kWh * (kgCO2e/kWh) * (t/kg) = tCO2e (confidence: 95%)
+  scope2IndirectEmissions <- ($.electricityUsage * 0.5) / 1000
+  // Type compatible: Float to Float. Sum of all scope 1 and scope 2 emissions (scope 3 not calculable from available data). All converted to tCO2e. Dimensional analysis: tCO2e + tCO2e + tCO2e = tCO2e (confidence: 95%)
+  totalEmissions <- (($.electricityUsage * 0.5) / 1000) + (($.naturalGasUsage * 2.0) / 1000) + (($.dieselFuelUsage * 2.7) / 1000)
+  // Type compatible: Float to Float. Total emissions divided by production volume. Conditional handles division by zero. Dimensional analysis: tCO2e / units = tCO2e per unit (confidence: 90%)
+  emissionsPerUnit <- if $.productionVolume > 0.0 then ((($.electricityUsage * 0.5) / 1000.0) + (($.naturalGasUsage * 2.0) / 1000.0) + (($.dieselFuelUsage * 2.7) / 1000.0)) / $.productionVolume else 0.0
+  // Type compatible: Float to Float. Total emissions divided by operating hours. Conditional handles division by zero. Dimensional analysis: tCO2e / hours = tCO2e per hour (confidence: 90%)
+  emissionsPerHour <- if $.operatingHours > 0.0 then ((($.electricityUsage * 0.5) / 1000.0) + (($.naturalGasUsage * 2.0) / 1000.0) + (($.dieselFuelUsage * 2.7) / 1000.0)) / $.operatingHours else 0.0
+  // Note: reportingPeriod field skipped - requires String to Date conversion function not yet available in Morpheus
+}
