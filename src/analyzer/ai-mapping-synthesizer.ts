@@ -124,6 +124,8 @@ Provide only the JSON array, no additional text.`;
   ): Promise<string> {
     const maxTokens = options.maxTokens || 4000;
     const temperature = options.temperature || 0.2;
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
 
     const requestBody = {
       model: this.model,
@@ -146,51 +148,98 @@ Provide only the JSON array, no additional text.`;
     console.log(`   Temperature: ${temperature}`);
     console.log(`   API Key: ${this.apiKey.substring(0, 20)}...${this.apiKey.slice(-4)}`);
 
-    let response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify(requestBody)
-      });
-    } catch (error) {
-      console.error(`\n❌ Fetch Error Details:`);
-      console.error(`   Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`);
-      console.error(`   Error Message: ${error instanceof Error ? error.message : String(error)}`);
-      if (error instanceof Error && 'cause' in error) {
-        console.error(`   Cause: ${error.cause}`);
+    // Check for proxy settings
+    const httpProxy = process.env.HTTP_PROXY || process.env.http_proxy;
+    const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
+    const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+
+    if (httpProxy || httpsProxy) {
+      console.log(`\n🔌 Proxy Settings Detected:`);
+      if (httpProxy) console.log(`   HTTP_PROXY: ${httpProxy}`);
+      if (httpsProxy) console.log(`   HTTPS_PROXY: ${httpsProxy}`);
+      if (noProxy) console.log(`   NO_PROXY: ${noProxy}`);
+    } else {
+      console.log(`\n🔌 Proxy: Not configured (using direct connection)`);
+    }
+
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`\n⏱️  Retry attempt ${attempt}/${maxRetries} after ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-      console.error(`   URL Attempted: ${url}`);
-      console.error(`   Model: ${this.model}`);
 
-      if (error instanceof Error) {
-        throw new Error(`Failed to call Anthropic API: ${error.message}\nModel: ${this.model}\nURL: ${url}\nError Type: ${error.constructor.name}`);
+      let response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify(requestBody)
+        });
+      } catch (error) {
+        console.error(`\n❌ Fetch Error Details (Attempt ${attempt + 1}/${maxRetries + 1}):`);
+        console.error(`   Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+        console.error(`   Error Message: ${error instanceof Error ? error.message : String(error)}`);
+        if (error instanceof Error && 'cause' in error) {
+          console.error(`   Cause: ${error.cause}`);
+        }
+        console.error(`   URL Attempted: ${url}`);
+        console.error(`   Model: ${this.model}`);
+
+        if (error instanceof Error) {
+          lastError = new Error(`Failed to call Anthropic API: ${error.message}\nModel: ${this.model}\nURL: ${url}\nError Type: ${error.constructor.name}`);
+
+          // Check if error is retryable (network errors like ECONNRESET, ETIMEDOUT, etc.)
+          const isRetryable = error.message.includes('ECONNRESET') ||
+                            error.message.includes('ETIMEDOUT') ||
+                            error.message.includes('ENOTFOUND') ||
+                            error.message.includes('ECONNREFUSED') ||
+                            error.message.includes('fetch failed');
+
+          if (isRetryable && attempt < maxRetries) {
+            console.log(`   ⚠️  Network error detected, will retry...`);
+            continue;
+          }
+        }
+        throw lastError || error;
       }
-      throw error;
+
+      console.log(`\n📡 Response Status: ${response.status} ${response.statusText}`);
+      console.log(`   Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}`);
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error(`\n❌ API Error Response:`);
+        console.error(`   Status: ${response.status} ${response.statusText}`);
+        console.error(`   Body: ${error}`);
+
+        // Retry on 529 (overloaded) or 5xx server errors
+        if ((response.status === 529 || response.status >= 500) && attempt < maxRetries) {
+          console.log(`   ⚠️  Server error detected, will retry...`);
+          lastError = new Error(`Anthropic API error: ${response.status} ${error}`);
+          continue;
+        }
+
+        throw new Error(`Anthropic API error: ${response.status} ${error}`);
+      }
+
+      const data = await response.json() as any;
+
+      if (!data.content || !data.content[0] || !data.content[0].text) {
+        throw new Error('Invalid response from Anthropic API');
+      }
+
+      return data.content[0].text as string;
     }
 
-    console.log(`\n📡 Response Status: ${response.status} ${response.statusText}`);
-    console.log(`   Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}`);
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error(`\n❌ API Error Response:`);
-      console.error(`   Status: ${response.status} ${response.statusText}`);
-      console.error(`   Body: ${error}`);
-      throw new Error(`Anthropic API error: ${response.status} ${error}`);
-    }
-
-    const data = await response.json() as any;
-
-    if (!data.content || !data.content[0] || !data.content[0].text) {
-      throw new Error('Invalid response from Anthropic API');
-    }
-
-    return data.content[0].text as string;
+    // If we get here, all retries failed
+    throw lastError || new Error('Failed to call Anthropic API after all retries');
   }
 
   private parseResponse(response: string): MappingCandidate[] {
