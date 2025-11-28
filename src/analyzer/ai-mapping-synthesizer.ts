@@ -2,6 +2,10 @@
 // Automatically generates transform mappings based on semantic understanding
 
 import * as AST from '../parser/ast';
+import { Lexer } from '../lexer/lexer';
+import { Parser } from '../parser/parser';
+import { TypeChecker } from '../analyzer/type-checker';
+import { SymbolTable } from '../analyzer/scope';
 
 export interface MappingCandidate {
   targetField: string;
@@ -22,6 +26,13 @@ export interface SynthesizeOptions {
   minConfidence?: number;
   maxTokens?: number;
   temperature?: number;
+  validateGenerated?: boolean;  // Whether to type-check generated code (default: true)
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
 }
 
 export class AIMappingSynthesizer {
@@ -88,19 +99,46 @@ ${sourceFields.map(f => `  - ${f.name}: ${f.type}`).join('\n')}
 **Target Schema: ${targetSchema.name}**
 ${targetFields.map(f => `  - ${f.name}: ${f.type}`).join('\n')}
 
+**Type System Rules**:
+1. **Type Compatibility**:
+   - String can map to String
+   - Int can map to Int or Float
+   - Float can map to Float
+   - Bool can map to Bool
+   - Date/DateTime types require conversion functions (parseDate, toDate)
+   - Optional types (T?) can accept T or null
+   - Quantity<Unit1> can map to Quantity<Unit2> ONLY with proper unit conversion
+
+2. **Unit Conversions** (for Quantity types):
+   - Preserve dimensional consistency: length*length = area, not volume
+   - Common conversions: kWh→MWh (÷1000), kg→t (÷1000), m→km (÷1000)
+   - Emission factors: energy*intensity = emissions (e.g., kWh * kgCO2e/kWh = kgCO2e)
+   - Always include conversion factors in transformExpr when changing units
+
+3. **Morpheus Syntax Requirements** (CRITICAL):
+   - Use ONLY straight single quotes (') for strings, NOT smart/curly quotes ('')
+   - Use ONLY ASCII characters - NO unicode superscripts (³), special symbols
+   - Field access: $.fieldName
+   - String concatenation: $.field1 + ' ' + $.field2
+   - Arithmetic: +, -, *, / (standard operators only)
+   - Comparison: ==, !=, <, >, <=, >=
+   - Functions: parseDate(), toDate(), toLowerCase(), toUpperCase()
+   - Conditionals: if CONDITION then EXPR else EXPR
+
 **Your Task**:
 For each field in the Target Schema, determine:
 1. Which Source Schema field(s) it should map from
-2. Confidence score (0.0 to 1.0) indicating how certain you are
-3. Clear reasoning for the mapping
-4. Any transformation logic needed (e.g., concatenation, unit conversion)
+2. Confidence score (0.0 to 1.0) indicating how certain you are about type correctness
+3. Clear reasoning for the mapping, explaining type compatibility
+4. Transformation logic using VALID Morpheus syntax only
 
 **Requirements**:
-- Only suggest mappings where types are semantically compatible
-- Consider field names, types, and semantic meaning
-- Explain your reasoning clearly
-- If a mapping requires transformation (e.g., combining firstName + lastName → fullName), specify the logic
-- If no good mapping exists for a target field, omit it
+- Only suggest mappings where types are compatible according to Type System Rules
+- For Quantity types, verify dimensional analysis is correct
+- Use only valid Morpheus syntax - no unicode, only ASCII
+- For unit conversions, show the conversion factor explicitly (e.g., * 0.001 for kg→t)
+- If types are incompatible, omit the mapping or reduce confidence score
+- Explain type reasoning: "Int to Int - direct compatible types" or "String to Date - requires parseDate()"
 
 **Output Format** (JSON array):
 \`\`\`json
@@ -109,11 +147,31 @@ For each field in the Target Schema, determine:
     "targetField": "field_name",
     "sourceField": "source_field_name",
     "confidence": 0.95,
-    "reasoning": "Detailed explanation",
-    "transformExpr": "$.firstName + ' ' + $.lastName"
+    "reasoning": "Type-aware explanation: source is String, target is String, direct compatible mapping",
+    "transformExpr": "$.sourceField"
+  },
+  {
+    "targetField": "total",
+    "sourceField": "value1,value2",
+    "confidence": 0.90,
+    "reasoning": "Type-aware: both Float types, sum operation preserves type",
+    "transformExpr": "$.value1 + $.value2"
   }
 ]
 \`\`\`
+
+**Examples of Valid transformExpr**:
+- "$.customerId" (direct mapping)
+- "$.firstName + ' ' + $.lastName" (string concatenation - use ' not ')
+- "($.electricityUsage * 0.5) / 1000" (unit conversion with explicit factors)
+- "$.accountStatus == 'active'" (boolean comparison)
+- "parseDate($.dateString)" (type conversion)
+- "if $.count > 0 then $.total / $.count else 0" (conditional)
+
+**INVALID Examples** (DO NOT USE):
+- 'GHG Protocol – Emission factors...' (uses – em dash, should use - hyphen)
+- 'Natural gas 2.0 kgCO2e/m³' (uses ³ superscript, write as m3)
+- "$.field" (uses smart quotes, use ' instead)
 
 Provide only the JSON array, no additional text.`;
   }
@@ -284,7 +342,11 @@ Provide only the JSON array, no additional text.`;
         return [];
       }
 
-      const jsonStr = jsonMatch[1] || jsonMatch[0];
+      let jsonStr = jsonMatch[1] || jsonMatch[0];
+
+      // Sanitize the JSON string before parsing
+      jsonStr = this.sanitizeGeneratedCode(jsonStr);
+
       const parsed = JSON.parse(jsonStr);
 
       if (!Array.isArray(parsed)) {
@@ -292,12 +354,13 @@ Provide only the JSON array, no additional text.`;
         return [];
       }
 
+      // Sanitize each mapping candidate
       return parsed.map(item => ({
         targetField: item.targetField,
         sourceField: item.sourceField,
         confidence: item.confidence,
-        reasoning: item.reasoning,
-        transformExpr: item.transformExpr
+        reasoning: this.sanitizeGeneratedCode(item.reasoning || ''),
+        transformExpr: item.transformExpr ? this.sanitizeGeneratedCode(item.transformExpr) : undefined
       }));
     } catch (e) {
       console.error('Failed to parse AI response:', e);
@@ -329,6 +392,39 @@ Provide only the JSON array, no additional text.`;
     }
   }
 
+  // Sanitize AI-generated code to fix common issues
+  private sanitizeGeneratedCode(code: string): string {
+    let sanitized = code;
+
+    // Replace ALL non-ASCII apostrophe-like characters with straight single quote
+    // This includes: ' ' ` ´ ʹ ʻ ʼ ʾ ʿ ˈ ˊ ˋ ˴  ᾽ ᾿  '  ' ‛ ′ ‵ `
+    sanitized = sanitized.replace(/[\u0060\u00B4\u02B9-\u02BC\u02BE\u02BF\u02C8\u02CA\u02CB\u02F4\u1FBD\u1FBF\u2018\u2019\u201B\u2032\u2035]/g, "'");
+
+    // Replace ALL non-ASCII double-quote-like characters with straight double quote
+    // This includes: " " „ ‟ ″ ‶
+    sanitized = sanitized.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
+
+    // Replace em/en dashes with hyphens
+    sanitized = sanitized.replace(/[\u2013\u2014]/g, '-');  // – —
+
+    // Replace unicode superscripts with ASCII
+    sanitized = sanitized.replace(/²/g, '2');
+    sanitized = sanitized.replace(/³/g, '3');
+    sanitized = sanitized.replace(/⁴/g, '4');
+    sanitized = sanitized.replace(/⁰/g, '0');
+    sanitized = sanitized.replace(/¹/g, '1');
+
+    // Replace multiplication dot with asterisk
+    sanitized = sanitized.replace(/·/g, '*');
+
+    // Replace unicode fractions
+    sanitized = sanitized.replace(/½/g, '0.5');
+    sanitized = sanitized.replace(/¼/g, '0.25');
+    sanitized = sanitized.replace(/¾/g, '0.75');
+
+    return sanitized;
+  }
+
   // Generate Morpheus transform code from mappings
   generateTransformCode(
     transformName: string,
@@ -346,7 +442,7 @@ Provide only the JSON array, no additional text.`;
       lines.push(`  // ${mapping.reasoning} (confidence: ${confidencePercent}%)`);
 
       if (mapping.transformExpr) {
-        // Use provided transformation expression
+        // Use provided transformation expression (already sanitized in parseResponse)
         lines.push(`  ${mapping.targetField} <- ${mapping.transformExpr}`);
       } else {
         // Simple field mapping
@@ -357,5 +453,102 @@ Provide only the JSON array, no additional text.`;
     lines.push(`}`);
 
     return lines.join('\n');
+  }
+
+  // Validate generated transform code using the type checker
+  validateTransformCode(
+    transformCode: string,
+    filename: string = 'ai-generated.morpheus'
+  ): ValidationResult {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    try {
+      // Lexical analysis
+      const lexer = new Lexer(transformCode, filename);
+      const { tokens, errors: lexErrors } = lexer.tokenize();
+
+      if (lexErrors.length > 0) {
+        errors.push(...lexErrors.map(e => `Lexical error: ${e.message}`));
+        return { valid: false, errors, warnings };
+      }
+
+      // Parsing
+      const parser = new Parser(tokens);
+      const { program, errors: parseErrors } = parser.parse();
+
+      if (parseErrors.length > 0) {
+        errors.push(...parseErrors.map(e => `Parse error: ${e.message}`));
+        return { valid: false, errors, warnings };
+      }
+
+      // Type checking
+      const symbolTable = new SymbolTable();
+      const typeChecker = new TypeChecker(symbolTable);
+      const { errors: typeErrors } = typeChecker.check(program);
+
+      if (typeErrors.length > 0) {
+        errors.push(...typeErrors.map((e: { message: string }) => `Type error: ${e.message}`));
+        return { valid: false, errors, warnings };
+      }
+
+      // Success
+      return { valid: true, errors: [], warnings };
+
+    } catch (error) {
+      if (error instanceof Error) {
+        errors.push(`Validation exception: ${error.message}`);
+      } else {
+        errors.push(`Unknown validation error: ${String(error)}`);
+      }
+      return { valid: false, errors, warnings };
+    }
+  }
+
+  // Generate and validate transform code
+  generateAndValidateTransformCode(
+    transformName: string,
+    sourceSchema: AST.SchemaDecl,
+    targetSchema: AST.SchemaDecl,
+    mappings: MappingCandidate[],
+    sourceFile: string = ''
+  ): { code: string; validation: ValidationResult } {
+    // Generate the complete Morpheus program with schema declarations
+    const lines: string[] = [];
+
+    // Include schema declarations from original file (if available)
+    if (sourceFile) {
+      lines.push(`// Original schemas from: ${sourceFile}`);
+      lines.push(``);
+    }
+
+    // For validation, we need the schema declarations
+    lines.push(`schema ${sourceSchema.name} {`);
+    for (const field of sourceSchema.fields) {
+      lines.push(`  ${field.name}: ${this.typeToString(field.type)}`);
+    }
+    lines.push(`}`);
+    lines.push(``);
+
+    lines.push(`schema ${targetSchema.name} {`);
+    for (const field of targetSchema.fields) {
+      lines.push(`  ${field.name}: ${this.typeToString(field.type)}`);
+    }
+    lines.push(`}`);
+    lines.push(``);
+
+    // Generate transform
+    const transformCode = this.generateTransformCode(transformName, sourceSchema, targetSchema, mappings);
+    lines.push(transformCode);
+
+    let fullCode = lines.join('\n');
+
+    // Sanitize the full code before validation
+    fullCode = this.sanitizeGeneratedCode(fullCode);
+
+    // Validate
+    const validation = this.validateTransformCode(fullCode);
+
+    return { code: transformCode, validation };
   }
 }
