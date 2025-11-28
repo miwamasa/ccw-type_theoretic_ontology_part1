@@ -307,15 +307,18 @@ async function aiMapCommand(inputFile: string, options: any): Promise<void> {
     console.log('');
   }
 
-  // Generate transform code
+  // Generate and validate transform code
   const transformName = options.transform ||
                         `${sourceSchema.name}To${targetSchema.name}`;
 
-  const transformCode = synthesizer.generateTransformCode(
+  console.log(`\n🔍 Generating and validating transform code...`);
+
+  const { code: transformCode, validation } = synthesizer.generateAndValidateTransformCode(
     transformName,
     sourceSchema,
     targetSchema,
-    mappings
+    mappings,
+    inputFile
   );
 
   console.log('━'.repeat(60));
@@ -324,10 +327,33 @@ async function aiMapCommand(inputFile: string, options: any): Promise<void> {
   console.log(transformCode);
   console.log('━'.repeat(60));
 
+  // Display validation results
+  if (validation.valid) {
+    console.log(`\n✅ Type checking: PASSED`);
+    console.log(`   The generated transform is type-safe and syntactically correct.`);
+  } else {
+    console.log(`\n❌ Type checking: FAILED`);
+    console.log(`   The AI-generated code has the following issues:\n`);
+    for (const error of validation.errors) {
+      console.log(`   ❌ ${error}`);
+    }
+    if (validation.warnings.length > 0) {
+      console.log(`\n   Warnings:`);
+      for (const warning of validation.warnings) {
+        console.log(`   ⚠️  ${warning}`);
+      }
+    }
+    console.log(`\n   💡 Suggestion: Try regenerating with more specific domain context.`);
+  }
+
   // Save to file if output specified
   if (options.output) {
     fs.writeFileSync(options.output, transformCode, 'utf-8');
     console.log(`\n✓ Saved to ${options.output}`);
+
+    if (!validation.valid) {
+      console.log(`   ⚠️  Note: The saved code contains type errors and may not compile.`);
+    }
   } else {
     console.log('\nℹ️  Use --output to save the generated transform to a file');
   }
@@ -338,4 +364,5 @@ async function aiMapCommand(inputFile: string, options: any): Promise<void> {
   console.log(`   Total mappings: ${mappings.length} / ${targetSchema.fields.length}`);
   console.log(`   Average confidence: ${(avgConfidence * 100).toFixed(0)}%`);
   console.log(`   Coverage: ${((mappings.length / targetSchema.fields.length) * 100).toFixed(0)}%`);
+  console.log(`   Type-safe: ${validation.valid ? 'Yes ✅' : 'No ❌'}`);
 }

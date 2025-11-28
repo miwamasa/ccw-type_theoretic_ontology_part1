@@ -1,0 +1,29 @@
+// AI-generated transform (confidence scores in comments)
+transform FactoryProductionDataToGHGEmissionsReport: FactoryProductionData -> GHGEmissionsReport {
+  // Direct mapping of facility/factory identifier. Both are String type and represent the same concept of uniquely identifying the production facility. (confidence: 100%)
+  facilityIdentifier <- $.factoryId
+  // Natural gas combustion is a Scope 1 direct emission. Convert m³ to tCO2e using emission factor 2.0 kgCO2e/m³, then divide by 1000 to get tonnes. (confidence: 100%)
+  scope1NaturalGas <- ($.naturalGasUsage * 2.0) / 1000
+  // Diesel combustion is a Scope 1 direct emission. Convert liters to tCO2e using emission factor 2.7 kgCO2e/L, then divide by 1000 to get tonnes. (confidence: 100%)
+  scope1DieselCombustion <- ($.dieselFuelUsage * 2.7) / 1000
+  // Total Scope 1 emissions are the sum of all direct emissions from natural gas and diesel combustion. (confidence: 100%)
+  scope1DirectEmissions <- (($.naturalGasUsage * 2.0) + ($.dieselFuelUsage * 2.7)) / 1000
+  // Electricity consumption is a Scope 2 indirect emission. Convert kWh to tCO2e using emission factor 0.5 kgCO2e/kWh, then divide by 1000 to get tonnes. (confidence: 100%)
+  scope2Electricity <- ($.electricityUsage * 0.5) / 1000
+  // Total Scope 2 emissions equal electricity emissions as it's the only Scope 2 source in the data. (confidence: 100%)
+  scope2IndirectEmissions <- ($.electricityUsage * 0.5) / 1000
+  // Total emissions are the sum of all Scope 1 and Scope 2 emissions (Scope 3 cannot be calculated without additional factors). (confidence: 100%)
+  totalEmissions <- (($.electricityUsage * 0.5) + ($.naturalGasUsage * 2.0) + ($.dieselFuelUsage * 2.7)) / 1000
+  // Emissions intensity per production unit. Total emissions divided by production volume. (confidence: 100%)
+  emissionsPerUnit <- ((($.electricityUsage * 0.5) + ($.naturalGasUsage * 2.0) + ($.dieselFuelUsage * 2.7)) / 1000) / $.productionVolume
+  // Emissions intensity per operating hour. Total emissions divided by operating hours. (confidence: 100%)
+  emissionsPerHour <- ((($.electricityUsage * 0.5) + ($.naturalGasUsage * 2.0) + ($.dieselFuelUsage * 2.7)) / 1000) / $.operatingHours
+  // Static value describing the calculation methodology used based on the provided emission factors. (confidence: 100%)
+  calculationMethodology <- 'Emission factors applied: Electricity 0.5 kgCO2e/kWh, Natural Gas 2.0 kgCO2e/m³, Diesel 2.7 kgCO2e/L'
+  // The month field represents the reporting period. Requires conversion from String to Date format. Assuming month is in a parseable format like 'YYYY-MM' or 'January 2024'. (confidence: 85%)
+  reportingPeriod <- parseDate($.month)
+  // Purchased goods are Scope 3 emissions. However, rawMaterialPurchased and packagingMaterialUsed appear to be quantities without emission factors provided. Cannot calculate emissions without additional conversion factors. (confidence: 60%)
+  scope3PurchasedGoods <- $.rawMaterialPurchased,packagingMaterialUsed
+  // Waste disposal is Scope 3. wasteGenerated minus wasteRecycled gives disposed waste, but emission factors for waste are not provided in the domain context. (confidence: 50%)
+  scope3WasteDisposal <- $.wasteGenerated,wasteRecycled
+}

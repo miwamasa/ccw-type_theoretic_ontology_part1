@@ -1,0 +1,13 @@
+// AI-generated transform (confidence scores in comments)
+transform SupplierEnvironmentalDataToSustainabilityReport: SupplierEnvironmentalData -> SustainabilityReport {
+  // Direct semantic match. The source field 'renewableEnergyRatio' represents the proportion of renewable energy used by suppliers, which aggregates to the organization's overall renewable energy percentage. Both fields represent the same metric. (confidence: 95%)
+  renewableEnergyPercentage <- AVG($.renewableEnergyRatio) * 100
+  // Direct count of suppliers that have environmental certifications. The certifications field indicates which suppliers are certified, allowing a straightforward count aggregation. (confidence: 90%)
+  suppliersCertified <- COUNT(DISTINCT $.supplierId WHERE $.certifications IS NOT NULL AND $.certifications != '')
+  // Suppliers with environmental certifications (ISO 14001, FSC, etc.) indicate sustainable sourcing. The ratio can be calculated by counting suppliers with certifications versus total suppliers. (confidence: 80%)
+  sustainableSourcingRatio <- COUNT($.certifications WHERE NOT NULL OR NOT EMPTY) / COUNT($.supplierId)
+  // Carbon intensity from suppliers can be used to calculate total GHG emissions. However, this requires additional data like production volumes or spend amounts to convert intensity metrics to absolute emissions. The mapping is semantically related but requires contextual transformation. (confidence: 75%)
+  totalGHGEmissions <- SUM($.carbonIntensity * supplier_volume_or_spend)
+  // The lastUpdated timestamp can be used to extract the year for the sustainability report. This assumes the data collection period aligns with the reporting year. (confidence: 70%)
+  reportYear <- YEAR(MAX($.lastUpdated))
+}

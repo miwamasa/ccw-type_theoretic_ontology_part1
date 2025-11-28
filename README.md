@@ -9,6 +9,7 @@ Morpheus is a domain-specific language (DSL) for type-safe data transformation b
 - **Type-safe transformations**: Compile-time verification of data transformations
 - **Unit system**: Physical units with dimensional analysis
 - **Schema definitions**: Define source and target data structures
+- **AI-assisted mapping**: Automatically generate transforms using Claude AI (NEW!)
 - **Lookup tables**: Type-safe external data references
 - **Aggregate operations**: sum, avg, max, min, collect, filter, groupBy
 - **Pipeline composition**: Chain multiple transformations
@@ -36,6 +37,22 @@ Type check only:
 ```bash
 npx morpheus check examples/cfp-example.morpheus
 ```
+
+Generate transforms using AI:
+
+```bash
+# Set up your Anthropic API key
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Generate transform automatically
+npx morpheus ai-map examples/ghg-emissions.morpheus \
+  --source FactoryProductionData \
+  --target GHGEmissionsReport \
+  --domain "Manufacturing GHG emissions reporting" \
+  -o generated-transform.morpheus
+```
+
+See [AI_MAPPING.md](AI_MAPPING.md) for detailed documentation.
 
 ### API
 

@@ -1,0 +1,106 @@
+// 工場の生産管理データからGHG（温室効果ガス）レポートへの変換例
+// これは自明ではないマッピングで、ドメイン知識とAIの理解力が必要
+
+// 工場の月次生産管理データ
+schema FactoryProductionData {
+  factoryId: String
+  month: String                    // "2024-01"形式
+  productionVolume: Float          // 生産量（トン）
+  operatingHours: Float            // 稼働時間（時間）
+
+  // エネルギー使用量
+  electricityUsage: Float          // 電力使用量（kWh）
+  naturalGasUsage: Float           // 天然ガス使用量（m³）
+  dieselFuelUsage: Float           // ディーゼル燃料使用量（L）
+
+  // 原材料
+  rawMaterialPurchased: Float      // 原材料購入量（トン）
+  packagingMaterialUsed: Float     // 包装材使用量（トン）
+
+  // 廃棄物
+  wasteGenerated: Float            // 廃棄物発生量（トン）
+  wasteRecycled: Float             // リサイクル量（トン）
+
+  // その他
+  waterConsumption: Float          // 水使用量（m³）
+  employeeCount: Int               // 従業員数
+}
+
+// GHG排出量レポート（ISO 14064準拠）
+schema GHGEmissionsReport {
+  facilityIdentifier: String
+  reportingPeriod: Date
+
+  // Scope 1: 直接排出
+  scope1DirectEmissions: Float     // tCO2e (トンCO2換算)
+  scope1NaturalGas: Float          // tCO2e
+  scope1DieselCombustion: Float    // tCO2e
+
+  // Scope 2: エネルギー起源の間接排出
+  scope2IndirectEmissions: Float   // tCO2e
+  scope2Electricity: Float         // tCO2e
+
+  // Scope 3: その他の間接排出
+  scope3OtherIndirect: Float       // tCO2e
+  scope3PurchasedGoods: Float      // tCO2e（原材料調達）
+  scope3WasteDisposal: Float       // tCO2e（廃棄物処理）
+
+  // 総排出量
+  totalEmissions: Float            // tCO2e
+
+  // 原単位
+  emissionsPerUnit: Float          // tCO2e/生産トン
+  emissionsPerHour: Float          // tCO2e/稼働時間
+
+  // メタデータ
+  calculationMethodology: String
+  verified: Bool
+}
+
+// サプライヤーの環境データ
+schema SupplierEnvironmentalData {
+  supplierId: String
+  supplierName: String
+  country: String
+  certifications: String           // "ISO14001,ISO50001"形式
+
+  // 製品のカーボンフットプリント
+  productCategory: String
+  carbonIntensity: Float           // kgCO2e/kg製品
+  renewableEnergyRatio: Float      // 0.0-1.0
+
+  // 輸送
+  averageTransportDistance: Float  // km
+  primaryTransportMode: String     // "truck", "ship", "rail"
+
+  lastUpdated: DateTime
+}
+
+// 統合されたサステナビリティレポート
+schema SustainabilityReport {
+  organizationId: String
+  reportYear: Int
+
+  // 環境パフォーマンス
+  totalGHGEmissions: Float         // tCO2e
+  ghgReductionFromBaseline: Float  // パーセンテージ
+  renewableEnergyPercentage: Float // 0-100
+
+  // 循環経済
+  recyclingRate: Float             // パーセンテージ
+  wasteToLandfill: Float           // トン
+  waterRecyclingRate: Float        // パーセンテージ
+
+  // サプライチェーン
+  sustainableSourcingRatio: Float  // パーセンテージ
+  suppliersCertified: Int          // 認証取得サプライヤー数
+
+  // 社会的側面
+  safetyIncidentRate: Float
+  employeeTurnoverRate: Float      // パーセンテージ
+
+  // コンプライアンス
+  regulatoryCompliance: Bool
+  auditedBy: String
+  publicationDate: Date
+}
